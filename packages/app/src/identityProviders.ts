@@ -20,9 +20,16 @@ import {
   oktaAuthApiRef,
   githubAuthApiRef,
   microsoftAuthApiRef,
+  oauth2ApiRef,
 } from '@backstage/core';
 
 export const providers = [
+  {
+    id: 'oauth2-provider',
+    title: 'oauth2',
+    message: 'Sign In using oauth2',
+    apiRef: oauth2ApiRef,
+  },
   {
     id: 'google-auth-provider',
     title: 'Google',
