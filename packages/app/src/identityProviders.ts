@@ -14,14 +14,7 @@
  * limitations under the License.
  */
 
-import {
-  googleAuthApiRef,
-  gitlabAuthApiRef,
-  oktaAuthApiRef,
-  githubAuthApiRef,
-  microsoftAuthApiRef,
-  oauth2ApiRef,
-} from '@backstage/core';
+import { oauth2ApiRef } from '@backstage/core';
 
 export const providers = [
   {
@@ -29,35 +22,5 @@ export const providers = [
     title: 'oauth2',
     message: 'Sign In using oauth2',
     apiRef: oauth2ApiRef,
-  },
-  {
-    id: 'google-auth-provider',
-    title: 'Google',
-    message: 'Sign In using Google',
-    apiRef: googleAuthApiRef,
-  },
-  {
-    id: 'microsoft-auth-provider',
-    title: 'Microsoft',
-    message: 'Sign In using Microsoft Azure AD',
-    apiRef: microsoftAuthApiRef,
-  },
-  {
-    id: 'gitlab-auth-provider',
-    title: 'GitLab',
-    message: 'Sign In using GitLab',
-    apiRef: gitlabAuthApiRef,
-  },
-  {
-    id: 'github-auth-provider',
-    title: 'GitHub',
-    message: 'Sign In using GitHub',
-    apiRef: githubAuthApiRef,
-  },
-  {
-    id: 'okta-auth-provider',
-    title: 'Okta',
-    message: 'Sign In using Okta',
-    apiRef: oktaAuthApiRef,
   },
 ];

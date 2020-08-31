@@ -23,3 +23,16 @@ export type PluginEnvironment = {
   database: Knex;
   config: Config;
 };
+
+export type InterceptorEnvironment = {
+  usersApiEndpoint: string;
+  tokenEndpoint: string;
+  jwtSigningKey: string;
+  logger: any;
+};
+
+export type TokenResponse = {
+  accessToken: string;
+  refreshToken: string;
+  idToken: string;
+};

@@ -4,11 +4,16 @@ app:
 
 backend:
   baseUrl: http://localhost:7000
-  listen:
-    port: 7000
+  tokenInterceptor:
+    tokenEndpoint: http://this.is.invalid/
+    usersApiEndpoint: https://users.auth.zalando.com/api/self
+    jwtSigningKey: 
+      $secret:
+        env: JWT_SIGNING_KEY
+  listen:  0.0.0.0:7000
   cors:
     origin: http://localhost:3000
-    methods: [GET, POST, PUT, DELETE]
+    methods: [GET, PUT, POST, DELETE, HEAD]
     credentials: true
   database:
     client: sqlite3
@@ -86,51 +91,6 @@ catalog:
 
 auth:
   providers:
-    google:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_GOOGLE_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_GOOGLE_CLIENT_SECRET
-    github:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_GITHUB_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_GITHUB_CLIENT_SECRET
-        enterpriseInstanceUrl:
-          $secret:
-            env: AUTH_GITHUB_ENTERPRISE_INSTANCE_URL
-    gitlab:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_GITLAB_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_GITLAB_CLIENT_SECRET
-        audience:
-          $secret:
-            env: GITLAB_BASE_URL
-    # saml:
-    #   development:
-    #     entryPoint: "http://localhost:7001/"
-    #     issuer: "passport-saml"
-    okta:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_OKTA_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_OKTA_CLIENT_SECRET
-        audience:
-          $secret:
-            env: AUTH_OKTA_AUDIENCE
     oauth2:
       development:
         clientId:
@@ -142,28 +102,4 @@ auth:
         authorizationUrl:
           $secret:
             env: AUTH_OAUTH2_AUTH_URL
-        tokenUrl:
-          $secret:
-            env: AUTH_OAUTH2_TOKEN_URL
-    auth0:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_AUTH0_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_AUTH0_CLIENT_SECRET
-        domain:
-          $secret:
-            env: AUTH_AUTH0_DOMAIN
-    microsoft:
-      development:
-        clientId:
-          $secret:
-            env: AUTH_MICROSOFT_CLIENT_ID
-        clientSecret:
-          $secret:
-            env: AUTH_MICROSOFT_CLIENT_SECRET
-        tenantId:
-          $secret:
-            env: AUTH_MICROSOFT_TENANT_ID
+        tokenUrl: http://localhost:7000/token

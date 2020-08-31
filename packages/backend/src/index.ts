@@ -14,88 +14,82 @@
  * limitations under the License.
  */
 
-/*
- * Hi!
- *
- * Note that this is an EXAMPLE Backstage backend. Please check the README.
- *
- * Happy hacking!
- */
-
+import knex from 'knex';
+import * as winston from 'winston';
+import { Config, ConfigReader } from '@backstage/config';
 import {
-  createDatabase,
-  createServiceBuilder,
   loadBackendConfig,
-  getRootLogger,
-  useHotMemoize,
+  createStatusCheckRouter,
+  createServiceBuilder,
 } from '@backstage/backend-common';
-import { ConfigReader, AppConfig } from '@backstage/config';
-import healthcheck from './plugins/healthcheck';
-import auth from './plugins/auth';
-import catalog from './plugins/catalog';
-import identity from './plugins/identity';
-import rollbar from './plugins/rollbar';
-import scaffolder from './plugins/scaffolder';
-import sentry from './plugins/sentry';
-import proxy from './plugins/proxy';
-import techdocs from './plugins/techdocs';
-import graphql from './plugins/graphql';
-import app from './plugins/app';
+import { createRouter } from '@backstage/plugin-auth-backend';
 import { PluginEnvironment } from './types';
+import { createInterceptorRouter } from './tokeninterceptor';
 
-function makeCreateEnv(loadedConfigs: AppConfig[]) {
-  const config = ConfigReader.fromConfigs(loadedConfigs);
+function makeLogger(config: Config) {
+  const logLevel = config.getOptionalString('logLevel') || 'info';
 
-  return (plugin: string): PluginEnvironment => {
-    const logger = getRootLogger().child({ type: 'plugin', plugin });
-    const database = createDatabase(config.getConfig('backend.database'), {
-      connection: {
-        database: `backstage_plugin_${plugin}`,
-      },
+  const logger = winston.createLogger({
+    level: logLevel,
+    format: winston.format.json(),
+    defaultMeta: { service: config.getString('app.title') },
+    transports: [new winston.transports.Console({ silent: false })],
+  });
+
+  return logger;
+}
+
+function makeEnv(
+  config: Config,
+  logger: winston.Logger,
+): PluginEnvironment | {} {
+  try {
+    const db = knex({
+      client: 'sqlite3',
+      connection: ':memory',
+      useNullAsDefault: true,
     });
-    return { logger, database, config };
-  };
+
+    db.client.pool.on('createSuccess', (_eventId: any, resource: any) => {
+      resource.run('PRAGMA foreign_keys = ON', () => {});
+    });
+
+    return { logger, config, database: db };
+  } catch (e) {
+    console.log(e);
+    return {};
+  }
 }
 
 async function main() {
-  const configs = await loadBackendConfig();
-  const configReader = ConfigReader.fromConfigs(configs);
-  const createEnv = makeCreateEnv(configs);
+  const config = ConfigReader.fromConfigs(await loadBackendConfig());
+  const logger = makeLogger(config);
+  const env = makeEnv(config, logger) as PluginEnvironment;
 
-  const healthcheckEnv = useHotMemoize(module, () => createEnv('healthcheck'));
-  const catalogEnv = useHotMemoize(module, () => createEnv('catalog'));
-  const scaffolderEnv = useHotMemoize(module, () => createEnv('scaffolder'));
-  const authEnv = useHotMemoize(module, () => createEnv('auth'));
-  const identityEnv = useHotMemoize(module, () => createEnv('identity'));
-  const proxyEnv = useHotMemoize(module, () => createEnv('proxy'));
-  const rollbarEnv = useHotMemoize(module, () => createEnv('rollbar'));
-  const sentryEnv = useHotMemoize(module, () => createEnv('sentry'));
-  const techdocsEnv = useHotMemoize(module, () => createEnv('techdocs'));
-  const graphqlEnv = useHotMemoize(module, () => createEnv('graphql'));
-  const appEnv = useHotMemoize(module, () => createEnv('app'));
+  const authRouter = await createRouter(env);
+  const interceptorRouter = await createInterceptorRouter(config, logger);
+  const healthCheckRouter = await createStatusCheckRouter({
+    logger: logger,
+    path: '/healthcheck',
+  });
 
   const service = createServiceBuilder(module)
-    .loadConfig(configReader)
-    .addRouter('', await healthcheck(healthcheckEnv))
-    .addRouter('/catalog', await catalog(catalogEnv))
-    .addRouter('/rollbar', await rollbar(rollbarEnv))
-    .addRouter('/scaffolder', await scaffolder(scaffolderEnv))
-    .addRouter('/sentry', await sentry(sentryEnv))
-    .addRouter('/auth', await auth(authEnv))
-    .addRouter('/identity', await identity(identityEnv))
-    .addRouter('/techdocs', await techdocs(techdocsEnv))
-    .addRouter('/proxy', await proxy(proxyEnv, '/proxy'))
-    .addRouter('/graphql', await graphql(graphqlEnv))
-    .addRouter('', await app(appEnv));
+    .loadConfig(config)
+    .enableCors({ origin: config.getString('app.baseUrl'), credentials: true })
+    .addRouter('', healthCheckRouter)
+    .addRouter('/auth', authRouter)
+    .addRouter('/token', interceptorRouter);
 
   await service.start().catch(err => {
-    console.log(err);
+    console.error(err);
     process.exit(1);
   });
+
+  module.hot?.accept();
 }
 
-module.hot?.accept();
-main().catch(error => {
-  console.error('Backend failed to start up', error);
+main().catch(value => {
+  console.log(value);
+  console.error(`Backend failed to start up, ${value}`);
   process.exit(1);
 });
