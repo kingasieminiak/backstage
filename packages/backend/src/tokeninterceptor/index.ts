@@ -26,25 +26,29 @@ function makeEnv(
 ): InterceptorEnvironment | {} {
   try {
     const usersApiEndpoint = config.getString(
-      'backend.tokeninterceptor.usersApiEndpoint',
+      'backend.tokenInterceptor.usersApiEndpoint',
     );
     const tokenEndpoint = config.getString(
-      'backend.tokeninterceptor.tokenEndpoint',
+      'backend.tokenInterceptor.tokenEndpoint',
     );
     const jwtSigningKey = config.getString(
-      'backend.tokeninterceptor.jwtSigningKey',
+      'backend.tokenInterceptor.jwtSigningKey',
     );
+    const devToken = config.getString('backend.devToken');
+
     return {
-      logger: logger,
-      usersApiEndpoint: usersApiEndpoint,
-      tokenEndpoint: tokenEndpoint,
-      jwtSigningKey: jwtSigningKey,
+      logger,
+      devToken,
+      usersApiEndpoint,
+      tokenEndpoint,
+      jwtSigningKey,
     };
   } catch (e) {
     console.log(e);
     return {};
   }
 }
+
 export async function createInterceptorRouter(
   config: ConfigReader,
   logger: winston.Logger,

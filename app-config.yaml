@@ -4,9 +4,16 @@ app:
 
 backend:
   baseUrl: http://localhost:7000
+  devToken:
+    $secret:
+      env: TOKEN
   tokenInterceptor:
-    tokenEndpoint: http://this.is.invalid/
-    usersApiEndpoint: https://users.auth.zalando.com/api/self
+    tokenEndpoint:
+      $secret:
+        env: AUTH_OAUTH2_TOKEN_URL
+    usersApiEndpoint: 
+      $secret:
+        env: USER_API_ENDPOINT
     jwtSigningKey: 
       $secret:
         env: JWT_SIGNING_KEY

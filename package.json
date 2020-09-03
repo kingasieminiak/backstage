@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "concurrently \"yarn start\" \"yarn start-backend\"",
     "start": "yarn workspace example-app start",
-    "start-backend": "yarn workspace example-backend start",
+    "start-backend": "TOKEN=$(ztoken) yarn workspace example-backend start",
     "build": "lerna run build",
     "tsc": "tsc",
     "clean": "backstage-cli clean && lerna run clean",

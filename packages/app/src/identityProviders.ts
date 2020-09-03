@@ -18,7 +18,7 @@ import { oauth2ApiRef } from '@backstage/core';
 
 export const providers = [
   {
-    id: 'oauth2-provider',
+    id: 'oauth2',
     title: 'oauth2',
     message: 'Sign In using oauth2',
     apiRef: oauth2ApiRef,

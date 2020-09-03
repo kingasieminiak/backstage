@@ -29,10 +29,5 @@ export type InterceptorEnvironment = {
   tokenEndpoint: string;
   jwtSigningKey: string;
   logger: any;
-};
-
-export type TokenResponse = {
-  accessToken: string;
-  refreshToken: string;
-  idToken: string;
+  devToken: string;
 };

@@ -17,9 +17,9 @@
 import express from 'express';
 import Router from 'express-promise-router';
 import bodyParser from 'body-parser';
-import { TokenResponse, InterceptorEnvironment } from '../types';
+import { InterceptorEnvironment } from '../types';
 import * as jwt from 'jsonwebtoken';
-import axios, { AxiosError } from 'axios';
+import axios from 'axios';
 
 class TokenExchangeHandler {
   environment: InterceptorEnvironment;
@@ -27,7 +27,8 @@ class TokenExchangeHandler {
   constructor(env: InterceptorEnvironment) {
     this.environment = env;
   }
-  generatePostParams(params: any): URLSearchParams {
+
+  private generatePostParams(params: any): URLSearchParams {
     const postParams = new URLSearchParams();
     for (const param in params) {
       if (params.hasOwnProperty(param)) {
@@ -36,11 +37,8 @@ class TokenExchangeHandler {
     }
     return postParams;
   }
-  /* es-lint no-shadow: 0 */
-  async generateIdToken(
-    accessToken: string,
-    refreshToken: string,
-  ): Promise<TokenResponse> {
+
+  private async generateIdToken(accessToken: string): Promise<string> {
     return axios
       .get(this.environment.usersApiEndpoint, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -50,123 +48,88 @@ class TokenExchangeHandler {
           { email: response.data.email },
           this.environment.jwtSigningKey,
         );
-        return {
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-          idToken: idToken,
-        };
+
+        return idToken;
       });
   }
 
   /* eslint @typescript-eslint/camelcase: "off", no-shadow: "off" */
+  private async handleAuthRequest(params: URLSearchParams) {
+    return axios.post(this.environment.tokenEndpoint, params).then(response => {
+      const { access_token, refresh_token } = response.data;
+      const token =
+        process.env.NODE_ENV === 'development'
+          ? this.environment.devToken
+          : access_token;
+
+      return {
+        access_token: token,
+        refresh_token: refresh_token,
+      };
+    });
+  }
+
   async handleTokenExchange(req: express.Request, res: express.Response) {
+    if (req.method !== 'POST') {
+      res.status(405).append('Allow', 'POST').end();
+    }
+
     const clientId = req.body.client_id;
     const clientSecret = req.body.client_secret;
     const code = req.body.code;
     const grantType = req.body.grant_type;
     const redirectUri = req.body.redirect_uri;
+
     this.environment.logger.info(JSON.stringify(req.body));
 
-    if (req.method !== 'POST') {
-      res
-        .status(405)
-        .append('Allow', 'POST')
-        .end();
+    if (!clientId || !clientSecret || !grantType) {
+      this.environment.logger.error(`
+        Invalid Parameter: clientId: ${clientId},
+        Empty clientSecret: ${typeof clientSecret === undefined},
+        Empty Code: ${typeof code === undefined},
+        grantType: ${grantType}, redirectUri: ${redirectUri}
+      `);
+
+      res.status(400).send('Invalid parameters for token exchange').end();
     }
 
-    if (!clientId || !clientSecret || !grantType) {
-      this.environment.logger.error(`Invalid Parameter: clientId: ${clientId},
-                                         Empty clientSecret: ${typeof clientSecret ===
-                                           undefined},
-                                         Empty Code: ${typeof code ===
-                                           undefined},
-                                         grantType: ${grantType}, redirectUri: ${redirectUri}`);
-      res
-        .status(400)
-        .send('Invalid parameters for token exchange')
-        .end();
-    }
+    let params: URLSearchParams;
+
     if (grantType === 'authorization_code') {
       this.environment.logger.info(
         `${clientId}::${clientSecret}::${grantType}::${redirectUri}::${code}`,
       );
-      const params: URLSearchParams = this.generatePostParams({
+
+      params = this.generatePostParams({
         code: code,
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: grantType,
         redirect_uri: redirectUri,
       });
-      axios
-        .post(this.environment.tokenEndpoint, params)
-        .then(response => {
-          const tokenBody = response.data;
-          const accessToken = tokenBody.access_token;
-          const refreshToken = tokenBody.refresh_token;
-
-          this.generateIdToken(accessToken, refreshToken)
-            .then((tokenResponse: TokenResponse) => {
-              const { accessToken, refreshToken, idToken } = tokenResponse;
-              res.json({
-                access_token: accessToken,
-                refresh_token: refreshToken,
-                id_token: idToken,
-              });
-            })
-            .catch((err: AxiosError) => {
-              this.environment.logger.error(
-                `Generating ID token error: ${err}`,
-              );
-              res.send(500).send(err);
-            });
-        })
-        .catch((err: AxiosError) => {
-          this.environment.logger.error(err);
-          res.sendStatus(500).send(err);
-        });
     } else {
-      const refresh_token = req.body.refresh_token;
-      const params = this.generatePostParams({
+      const { refresh_token } = req.body;
+
+      params = this.generatePostParams({
         refresh_token: refresh_token,
         client_id: clientId,
         client_secret: clientSecret,
         grant_type: grantType,
       });
+    }
 
-      axios
-        .post(this.environment.tokenEndpoint, params)
-        .then(response => {
-          const tokenBody = response.data;
-          const { access_token } = tokenBody;
-          this.generateIdToken(access_token, refresh_token)
-            .then(tokenResponse => {
-              const { idToken } = tokenResponse;
-              res.json({
-                access_token: access_token,
-                refresh_token: tokenBody.refresh_token,
-                id_token: idToken,
-              });
-            })
-            .catch(err => {
-              this.environment.logger.error('error when generating ID token');
-              res
-                .status(500)
-                .send(err)
-                .end();
-            });
-        })
-        .catch((err: AxiosError) => {
-          this.environment.logger.error(
-            `${JSON.stringify(err.response?.data)}`,
-          );
-          this.environment.logger.error(
-            `${JSON.stringify(err.response?.status)}`,
-          );
-          res
-            .status(500)
-            .json(err)
-            .end();
-        });
+    try {
+      const authResponse = await this.handleAuthRequest(params);
+      const idToken = await this.generateIdToken(authResponse.access_token);
+
+      res.json({
+        access_token: authResponse.access_token,
+        refresh_token: authResponse.refresh_token,
+        id_token: idToken,
+      });
+    } catch (error) {
+      this.environment.logger.error(error);
+      res.send(500).send(error);
     }
   }
 }
