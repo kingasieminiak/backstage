@@ -54,5 +54,13 @@ export async function createInterceptorRouter(
   logger: winston.Logger,
 ): Promise<express.Router> {
   const env = makeEnv(config, logger) as InterceptorEnvironment;
-  return router.createRouter(env);
+  return router.createTokenRouter(env);
+}
+
+export async function createLocalAuthRouter(
+  config: ConfigReader,
+  logger: winston.Logger,
+): Promise<express.Router> {
+  const env = makeEnv(config, logger) as InterceptorEnvironment;
+  return router.createLocalAuthRouter(env);
 }

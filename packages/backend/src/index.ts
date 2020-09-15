@@ -24,7 +24,10 @@ import {
 } from '@backstage/backend-common';
 import { createRouter } from '@backstage/plugin-auth-backend';
 import { PluginEnvironment } from './types';
-import { createInterceptorRouter } from './tokeninterceptor';
+import {
+  createInterceptorRouter,
+  createLocalAuthRouter,
+} from './tokeninterceptor';
 
 function makeLogger(config: Config) {
   const logLevel = config.getOptionalString('logLevel') || 'info';
@@ -73,11 +76,14 @@ async function main() {
     path: '/healthcheck',
   });
 
+  const localAuthRouter = await createLocalAuthRouter(config, logger);
+
   const service = createServiceBuilder(module)
     .loadConfig(config)
     .enableCors({ origin: config.getString('app.baseUrl'), credentials: true })
     .addRouter('', healthCheckRouter)
     .addRouter('/auth', authRouter)
+    .addRouter('/auth-local', localAuthRouter)
     .addRouter('/token', interceptorRouter);
 
   await service.start().catch(err => {

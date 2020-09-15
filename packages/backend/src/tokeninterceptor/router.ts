@@ -57,14 +57,10 @@ class TokenExchangeHandler {
   private async handleAuthRequest(params: URLSearchParams) {
     return axios.post(this.environment.tokenEndpoint, params).then(response => {
       const { access_token, refresh_token } = response.data;
-      const token =
-        process.env.NODE_ENV === 'development'
-          ? this.environment.devToken
-          : access_token;
 
       return {
-        access_token: token,
-        refresh_token: refresh_token,
+        access_token,
+        refresh_token,
       };
     });
   }
@@ -132,20 +128,55 @@ class TokenExchangeHandler {
       res.send(500).send(error);
     }
   }
+
+  async handleLocalTokenExchange(_: express.Request, res: express.Response) {
+    try {
+      const idToken = await this.generateIdToken(this.environment.devToken);
+
+      res.json({
+        access_token: this.environment.devToken,
+        refresh_token: this.environment.devToken,
+        id_token: idToken,
+      });
+    } catch (error) {
+      this.environment.logger.error(error);
+      res.send(500).send(error);
+    }
+  }
 }
 
-export async function createRouter(
+function createRouter(
   environment: InterceptorEnvironment,
-): Promise<express.Router> {
+): {
+  router: express.Router;
+  handler: TokenExchangeHandler;
+} {
   const router = Router();
 
   router.use(bodyParser.json());
   router.use(bodyParser.urlencoded({ extended: false }));
   const tokenExchangeHandler = new TokenExchangeHandler(environment);
 
-  router.use(
-    tokenExchangeHandler.handleTokenExchange.bind(tokenExchangeHandler),
-  );
+  return {
+    router,
+    handler: tokenExchangeHandler,
+  };
+}
+
+export async function createTokenRouter(
+  environment: InterceptorEnvironment,
+): Promise<express.Router> {
+  const { router, handler } = createRouter(environment);
+  router.use(handler.handleTokenExchange.bind(handler));
+
+  return router;
+}
+
+export async function createLocalAuthRouter(
+  environment: InterceptorEnvironment,
+): Promise<express.Router> {
+  const { router, handler } = createRouter(environment);
+  router.use(handler.handleLocalTokenExchange.bind(handler));
 
   return router;
 }
